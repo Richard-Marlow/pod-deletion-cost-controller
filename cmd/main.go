@@ -21,6 +21,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/lablabs/pod-deletion-cost-controller/internal/cpu"
 	"github.com/lablabs/pod-deletion-cost-controller/internal/zone"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -118,6 +120,16 @@ func main() {
 	err = zone.Register(logger, moduleMng, mgr.GetClient(), algoType)
 	if err != nil {
 		logger.Error(err, "unable to register zone")
+		os.Exit(1)
+	}
+	metricsClient, err := metricsclientset.NewForConfig(ctrl.GetConfigOrDie())
+	if err != nil {
+		logger.Error(err, "unable to create metrics client")
+		os.Exit(1)
+	}
+	err = cpu.Register(logger, moduleMng, mgr.GetClient(), metricsClient, algoType)
+	if err != nil {
+		logger.Error(err, "unable to register cpu")
 		os.Exit(1)
 	}
 	if err := (&controller.PodReconciler{
